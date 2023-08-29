@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/skirrund/gcloud/bootstrap/env"
 	gLogger "github.com/skirrund/gcloud/logger"
 	gHttp "github.com/skirrund/gcloud/server/http"
 	"github.com/skirrund/gcloud/utils"
@@ -97,6 +98,12 @@ func Init(opts Options) *Executor {
 
 func (e *Executor) Stop() {
 	e.registryRemove()
+}
+
+func RunWithDefaultOptions() (executor *Executor, err error) {
+	opts := Options{}
+	utils.NewOptions(env.GetInstance(), &opts)
+	return RunWithOptions(opts)
 }
 
 func RunWithOptions(opts Options) (executor *Executor, err error) {
