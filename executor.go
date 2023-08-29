@@ -71,7 +71,7 @@ func Init(opts Options) *Executor {
 		port = DefaultExecutorPort
 	}
 	portStr := strconv.FormatInt(port, 10)
-	e.address = ip + ":" + portStr + "/"
+	e.address = ip + ":" + portStr
 	appName := opts.AppName
 	if len(appName) == 0 {
 		appName = DefaultAppName
@@ -99,6 +99,11 @@ func (e *Executor) Stop() {
 	e.registryRemove()
 }
 
+func RunWithOptions(opts Options) (executor *Executor, err error) {
+	executor = Init(opts)
+	return executor, executor.Run()
+}
+
 func (e *Executor) Run() (err error) {
 	// 创建路由器
 	mux := http.NewServeMux()
@@ -108,25 +113,25 @@ func (e *Executor) Run() (err error) {
 	mux.HandleFunc("/log", e.taskLog)
 	mux.HandleFunc("/beat", e.beat)
 	mux.HandleFunc("/idleBeat", e.idleBeat)
-	// 创建服务器
-	server := &http.Server{
-		Addr:         e.address,
-		WriteTimeout: time.Second * 3,
-		Handler:      mux,
-	}
-	// 监听端口并提供服务
-	e.logger.Info("Starting server at " + e.address)
-	go func() {
+	go func(e *Executor) {
+		// 创建服务器
+		server := &http.Server{
+			Addr:         e.address,
+			WriteTimeout: time.Second * 3,
+			Handler:      mux,
+		}
+		// 监听端口并提供服务
+		e.logger.Info("Starting server at " + e.address)
 		err := server.ListenAndServe()
 		if err != nil {
 			e.logger.Panic(err)
 			panic(err)
 		}
-	}()
+	}(e)
 	quit := make(chan os.Signal, 2)
 	signal.Notify(quit, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	e.registryRemove()
+	e.Stop()
 	return nil
 }
 
@@ -291,6 +296,7 @@ func (e *Executor) registryRemove() {
 		RegistryKey:   e.opts.AppName,
 		RegistryValue: DefaultRegisterAddressHttp + e.address,
 	}
+	e.logger.Info("执行器摘除:", DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
 	for _, addr := range e.opts.adminAddresseList {
 		result, err := e.post(addr, regRemovePath, req)
 		if err != nil {
@@ -309,6 +315,9 @@ func (e *Executor) registry() {
 		RegistryGroup: DefaultRegistryGroup,
 		RegistryKey:   e.opts.AppName,
 		RegistryValue: DefaultRegisterAddressHttp + e.address,
+	}
+	if !strings.HasSuffix(req.RegistryValue, "/") {
+		req.RegistryValue += "/"
 	}
 	for {
 		<-t.C

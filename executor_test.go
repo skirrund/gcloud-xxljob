@@ -3,6 +3,7 @@ package gcloudxxljob
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/skirrund/gcloud/logger"
@@ -14,9 +15,12 @@ func TestXxx(t *testing.T) {
 		AppName:          "xxl-job-test-go",
 		Logretentiondays: 1,
 	}
-	executor := Init(opts)
+	executor, err := RunWithOptions(opts)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 	executor.RegTask("go-test", JobRun)
-	executor.Run()
 }
 func JobRun(ctx context.Context, req *RunRequest) error {
 	logger.Info("run job")

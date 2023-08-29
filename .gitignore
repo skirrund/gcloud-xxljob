@@ -1,1 +1,4 @@
 *.log
+.vscode
+xxl-job-test
+xxl-job-test-go
