@@ -25,6 +25,8 @@ type Options struct {
 	//执行器日志文件保存天数 [选填] ： 过期日志自动清理, 限制值大于等于3时生效; 否则, 如-1, 关闭自动清理功能；
 	Logretentiondays uint64 `json:"logretentiondays" property:"xxl.job.executor.logretentiondays"`
 	LogJsonFormat    bool   `json:"logJsonFormat" property:"xxl.job.executor.logJsonFormat"`
+	//执行器心跳间隔单位秒
+	BeatInterval uint64 `json:"beatInterval" property:"xxl.job.executor.beatInterval"`
 }
 
 func (opt *Options) WithAdminAddresses(adminAddresses string) *Options {

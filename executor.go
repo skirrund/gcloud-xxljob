@@ -25,6 +25,7 @@ const (
 	regRemovePath        = "/api/registryRemove"
 	callBackPath         = "/api/callback"
 	AccessTokenHeaderKey = "XXL-JOB-ACCESS-TOKEN"
+	DefaultBeatInterval  = 20
 )
 
 // Executor 执行器
@@ -91,6 +92,9 @@ func Init(opts Options) *Executor {
 	}
 	e.runList = &taskList{
 		data: make(map[string]*Task),
+	}
+	if opts.BeatInterval <= 0 {
+		opts.BeatInterval = DefaultBeatInterval
 	}
 	go e.registry()
 	return e
@@ -325,6 +329,11 @@ func (e *Executor) registryRemove() {
 
 // 注册执行器到调度中心
 func (e *Executor) registry() {
+	beatInterval := e.opts.BeatInterval
+	if beatInterval <= 0 {
+		beatInterval = DefaultBeatInterval
+	}
+	dura := time.Second * time.Duration(beatInterval)
 	t := time.NewTimer(time.Second * 0) //初始立即执行
 	defer t.Stop()
 	req := &Registry{
@@ -337,7 +346,7 @@ func (e *Executor) registry() {
 	}
 	for {
 		<-t.C
-		//t.Reset(time.Second * time.Duration(20)) //20秒心跳防止过期
+		t.Reset(dura) //20秒心跳防止过期
 		for _, addr := range e.opts.adminAddresseList {
 			result, err := e.post(addr, regPath, req)
 			if err != nil {

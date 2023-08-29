@@ -21,6 +21,9 @@ func TestXxx(t *testing.T) {
 		return
 	}
 	executor.RegTask("go-test", JobRun)
+	var s string
+	fmt.Scanln(&s)
+	fmt.Println(s)
 }
 func JobRun(ctx context.Context, req *RunRequest) error {
 	logger.Info("run job")
