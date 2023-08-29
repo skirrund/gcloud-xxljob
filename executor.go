@@ -100,6 +100,13 @@ func (e *Executor) Stop() {
 	e.registryRemove()
 }
 
+func RunWithDefaultOptionsLogger(logger *zap.SugaredLogger) (executor *Executor, err error) {
+	opts := Options{}
+	opts.Logger = logger
+	utils.NewOptions(env.GetInstance(), &opts)
+	return RunWithOptions(opts)
+}
+
 func RunWithDefaultOptions() (executor *Executor, err error) {
 	opts := Options{}
 	utils.NewOptions(env.GetInstance(), &opts)
