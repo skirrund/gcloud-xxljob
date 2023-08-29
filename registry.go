@@ -1,4 +1,4 @@
-package gcloudxxljob
+package gxxljob
 
 type Registry struct {
 	RegistryGroup string `json:"registryGroup"` // 固定值EXECUTOR

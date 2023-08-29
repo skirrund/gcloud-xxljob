@@ -1,4 +1,4 @@
-package gcloudxxljob
+package gxxljob
 
 // 说明：触发任务执行
 type RunRequest struct {

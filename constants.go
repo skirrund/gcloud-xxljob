@@ -1,4 +1,4 @@
-package gcloudxxljob
+package gxxljob
 
 const (
 	SuccessCode         = 200
