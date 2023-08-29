@@ -241,7 +241,7 @@ func (e *Executor) callback(task *Task, code int64, msg string) {
 		HandleMsg:  msg,
 	}
 	for _, addr := range e.opts.adminAddresseList {
-		result, err := e.post(addr, callBackPath, req)
+		result, err := e.post(addr, callBackPath, []*JobHandleResult{req})
 		if err != nil {
 			e.logger.Error("回调任务失败:", err.Error(), ",", result.Code, ",", result.Msg)
 			return
