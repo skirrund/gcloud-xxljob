@@ -321,12 +321,14 @@ func (e *Executor) registryRemove() {
 	}
 	e.logger.Debug("执行器摘除:", DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
 	for _, addr := range e.opts.adminAddresseList {
-		result, err := e.post(addr, regRemovePath, req)
-		if err != nil {
-			e.logger.Error("执行器摘除失败:", err.Error(), ",", result.Code, ",", result.Msg)
-			return
-		}
-		e.logger.Debug("执行器摘除成功:", result.Code, "[", result.Msg)
+		go func(url string) {
+			result, err := e.post(url, regRemovePath, req)
+			if err != nil {
+				e.logger.Error("执行器摘除失败:", err.Error(), ",", result.Code, ",", result.Msg)
+				return
+			}
+			e.logger.Debug("执行器摘除成功:", result.Code, "[", result.Msg)
+		}(addr)
 	}
 }
 
@@ -351,12 +353,14 @@ func (e *Executor) registry() {
 		<-t.C
 		t.Reset(dura) //20秒心跳防止过期
 		for _, addr := range e.opts.adminAddresseList {
-			result, err := e.post(addr, regPath, req)
-			if err != nil {
-				e.logger.Error("执行器注册失败:", err.Error(), ",", result.Code, ",", result.Msg)
-				return
-			}
-			e.logger.Debug("执行器注册成功:", result.Code, "->", result.Msg)
+			go func(url string) {
+				result, err := e.post(url, regPath, req)
+				if err != nil {
+					e.logger.Error("执行器注册失败:", err.Error(), ",", result.Code, ",", result.Msg)
+					return
+				}
+				e.logger.Debug("执行器注册成功:", result.Code, "->", result.Msg)
+			}(addr)
 		}
 
 	}
