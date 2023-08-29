@@ -142,10 +142,12 @@ func (e *Executor) Run() (err error) {
 			panic(err)
 		}
 	}(e)
-	quit := make(chan os.Signal, 2)
-	signal.Notify(quit, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	e.Stop()
+	go func(e *Executor) {
+		quit := make(chan os.Signal, 2)
+		signal.Notify(quit, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		e.Stop()
+	}(e)
 	return nil
 }
 
