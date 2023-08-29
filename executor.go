@@ -1,6 +1,7 @@
 package gxxljob
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -14,8 +15,8 @@ import (
 	"time"
 
 	"github.com/skirrund/gcloud/bootstrap/env"
+	"github.com/skirrund/gcloud/logger"
 	gLogger "github.com/skirrund/gcloud/logger"
-	gHttp "github.com/skirrund/gcloud/server/http"
 	"github.com/skirrund/gcloud/utils"
 	"go.uber.org/zap"
 )
@@ -27,6 +28,8 @@ const (
 	AccessTokenHeaderKey = "XXL-JOB-ACCESS-TOKEN"
 	DefaultBeatInterval  = 20
 )
+
+var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 // Executor 执行器
 type Executor struct {
@@ -139,7 +142,7 @@ func (e *Executor) Run() (err error) {
 			Handler:      mux,
 		}
 		// 监听端口并提供服务
-		e.logger.Info("Starting server at " + e.address)
+		e.logger.Info("[xxljob] Starting server at " + e.address)
 		err := server.ListenAndServe()
 		if err != nil {
 			e.logger.Panic(err)
@@ -202,21 +205,21 @@ func (e *Executor) taskLog(writer http.ResponseWriter, request *http.Request) {
 		LogContent:  "",
 		IsEnd:       true,
 	}
-	e.logger.Info("日志请求参数:%+v", req)
+	e.logger.Debug("日志请求参数:%+v", req)
 	str, _ := utils.Marshal(res)
 	_, _ = writer.Write(str)
 }
 
 // 心跳检测
 func (e *Executor) beat(writer http.ResponseWriter, request *http.Request) {
-	e.logger.Info("[xxljob]心跳检测")
+	e.logger.Debug("[xxljob]心跳检测")
 	_, _ = writer.Write(commonSuccessResp())
 }
 
 // 忙碌检测
 func (e *Executor) idleBeat(writer http.ResponseWriter, request *http.Request) {
 	req, _ := io.ReadAll(request.Body)
-	e.logger.Info("[xxljob]忙碌检测>>>>", string(req))
+	e.logger.Debug("[xxljob]忙碌检测>>>>", string(req))
 	param := &IdleBeatReq{}
 	err := utils.Unmarshal(req, &param)
 	if err != nil {
@@ -232,7 +235,7 @@ func (e *Executor) idleBeat(writer http.ResponseWriter, request *http.Request) {
 		e.logger.Error("idleBeat任务[" + jobIdStr + "]正在运行")
 		return
 	}
-	e.logger.Info("忙碌检测任务参数:%v", param)
+	e.logger.Debug("忙碌检测任务参数:%v", param)
 	_, _ = writer.Write(commonSuccessResp())
 }
 
@@ -252,14 +255,14 @@ func (e *Executor) callback(task *Task, code int64, msg string) {
 			e.logger.Error("回调任务失败:", err.Error(), ",", result.Code, ",", result.Msg)
 			return
 		}
-		e.logger.Info("回调任务成功:", result.Code, "[", result.Msg)
+		e.logger.Debug("回调任务成功:", result.Code, "[", result.Msg)
 	}
 }
 
 // 运行一个任务
 func (e *Executor) runTask(writer http.ResponseWriter, request *http.Request) {
 	req, _ := io.ReadAll(request.Body)
-	e.logger.Info("[xxljob]runTask>>>>>", string(req))
+	e.logger.Debug("[xxljob]runTask>>>>>", string(req))
 	param := &RunRequest{}
 	err := utils.Unmarshal(req, param)
 	if err != nil {
@@ -267,7 +270,7 @@ func (e *Executor) runTask(writer http.ResponseWriter, request *http.Request) {
 		e.logger.Error("参数解析错误:" + string(req))
 		return
 	}
-	e.logger.Info("任务参数:%v", param)
+	e.logger.Debug("任务参数:%v", param)
 	jodIdStr := strconv.FormatInt(param.JobID, 10)
 	if !e.regList.Exists(param.ExecutorHandler) {
 		_, _ = writer.Write(commonFailWithMsgResp("Task not registered"))
@@ -305,7 +308,7 @@ func (e *Executor) runTask(writer http.ResponseWriter, request *http.Request) {
 	go task.Run(func(code int64, msg string) {
 		e.callback(task, code, msg)
 	})
-	e.logger.Info("任务[" + jodIdStr + "]开始执行:" + param.ExecutorHandler)
+	e.logger.Debug("任务[" + jodIdStr + "]开始执行:" + param.ExecutorHandler)
 	_, _ = writer.Write(commonSuccessResp())
 }
 
@@ -316,14 +319,14 @@ func (e *Executor) registryRemove() {
 		RegistryKey:   e.opts.AppName,
 		RegistryValue: DefaultRegisterAddressHttp + e.address,
 	}
-	e.logger.Info("执行器摘除:", DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
+	e.logger.Debug("执行器摘除:", DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
 	for _, addr := range e.opts.adminAddresseList {
 		result, err := e.post(addr, regRemovePath, req)
 		if err != nil {
 			e.logger.Error("执行器摘除失败:", err.Error(), ",", result.Code, ",", result.Msg)
 			return
 		}
-		e.logger.Info("执行器摘除成功:", result.Code, "[", result.Msg)
+		e.logger.Debug("执行器摘除成功:", result.Code, "[", result.Msg)
 	}
 }
 
@@ -353,7 +356,7 @@ func (e *Executor) registry() {
 				e.logger.Error("执行器注册失败:", err.Error(), ",", result.Code, ",", result.Msg)
 				return
 			}
-			e.logger.Info("执行器注册成功:", result.Code, "->", result.Msg)
+			e.logger.Debug("执行器注册成功:", result.Code, "->", result.Msg)
 		}
 
 	}
@@ -365,9 +368,30 @@ func (e *Executor) post(addr, path string, body any) (resp *Resp, err error) {
 		header[AccessTokenHeaderKey] = e.opts.AccessToken
 	}
 	resp = &Resp{}
-	_, err = gHttp.PostJSONUrl(addr+path, header, body, resp)
+	bodyBytes, err := utils.Marshal(body)
 	if err != nil {
-		return
+		logger.Error("[xxljob] request error:", err.Error())
+		return resp, err
+	}
+	httpReq, err := http.NewRequest(http.MethodPost, addr+path, bytes.NewReader(bodyBytes))
+	headers := httpReq.Header
+	headers.Set("Content-Type", "application/json;charset=utf-8")
+	if len(e.opts.AccessToken) > 0 {
+		headers.Set("AccessTokenHeaderKey", e.opts.AccessToken)
+	}
+	httpResp, err := httpClient.Do(httpReq)
+	//_, err = gHttp.PostJSONUrl(addr+path, header, body, resp)
+	if err != nil {
+		return resp, err
+	}
+	defer httpResp.Body.Close()
+	r, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return resp, err
+	}
+	err = utils.Unmarshal(r, resp)
+	if err != nil {
+		return resp, err
 	}
 	if resp.Code != SuccessCode {
 		return resp, errors.New("[xxljob] 请求失败")
