@@ -319,6 +319,9 @@ func (e *Executor) registryRemove() {
 		RegistryKey:   e.opts.AppName,
 		RegistryValue: DefaultRegisterAddressHttp + e.address,
 	}
+	if !strings.HasSuffix(req.RegistryValue, "/") {
+		req.RegistryValue += "/"
+	}
 	e.logger.Info("[xxljob] 执行器摘除:"+DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
 	for _, addr := range e.opts.adminAddresseList {
 		go func(url string) {
