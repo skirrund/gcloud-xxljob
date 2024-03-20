@@ -151,7 +151,8 @@ func (e *Executor) Run() (err error) {
 	go func(e *Executor) {
 		quit := make(chan os.Signal, 2)
 		signal.Notify(quit, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
-		<-quit
+		sig := <-quit
+		e.logger.Info("[xxljob] Received signal:" + sig.String())
 		e.Stop()
 	}(e)
 	return nil
@@ -318,15 +319,15 @@ func (e *Executor) registryRemove() {
 		RegistryKey:   e.opts.AppName,
 		RegistryValue: DefaultRegisterAddressHttp + e.address,
 	}
-	e.logger.Debug("执行器摘除:"+DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
+	e.logger.Info("[xxljob] 执行器摘除:"+DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
 	for _, addr := range e.opts.adminAddresseList {
 		go func(url string) {
 			result, err := e.post(url, regRemovePath, req)
 			if err != nil {
-				e.logger.Error("执行器摘除失败:"+err.Error(), ",", result.Code, ",", result.Msg)
+				e.logger.Error("[xxljob] 执行器摘除失败:"+err.Error(), ",", result.Code, ",", result.Msg)
 				return
 			}
-			e.logger.Debug("执行器摘除成功:", strconv.FormatInt(result.Code, 10), "[", result.Msg)
+			e.logger.Info("[xxljob] 执行器摘除成功:", strconv.FormatInt(result.Code, 10), "[", result.Msg)
 		}(addr)
 	}
 }
