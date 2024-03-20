@@ -3,8 +3,7 @@ package gxxljob
 import (
 	"context"
 	"fmt"
-
-	"go.uber.org/zap"
+	"log/slog"
 )
 
 // TaskFunc 任务执行函数
@@ -21,7 +20,7 @@ type Task struct {
 	StartTime int64
 	EndTime   int64
 	//日志
-	log *zap.SugaredLogger
+	log *slog.Logger
 }
 
 // Run 运行任务

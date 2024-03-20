@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,10 +16,8 @@ import (
 	"time"
 
 	"github.com/skirrund/gcloud/bootstrap/env"
-	"github.com/skirrund/gcloud/logger"
 	gLogger "github.com/skirrund/gcloud/logger"
 	"github.com/skirrund/gcloud/utils"
-	"go.uber.org/zap"
 )
 
 const (
@@ -38,7 +37,7 @@ type Executor struct {
 	address string
 	regList *taskList //注册任务列表
 	runList *taskList //正在执行任务列表
-	logger  *zap.SugaredLogger
+	logger  *slog.Logger
 	//	// Init 初始化
 	//	Init(...Options)
 	//	// LogHandler 日志查询
@@ -86,7 +85,7 @@ func Init(opts Options) *Executor {
 		opts.LogPath = "."
 	}
 	if logger == nil {
-		logger = gLogger.NewLogInstance(opts.LogPath, opts.AppName, portStr, true, opts.LogJsonFormat, opts.Logretentiondays).WithOptions(zap.AddCallerSkip(-1))
+		logger = gLogger.NewLogInstance(opts.LogPath, opts.AppName, portStr, true, opts.LogJsonFormat, opts.Logretentiondays)
 	}
 	e.logger = logger
 	e.opts = opts
@@ -107,7 +106,7 @@ func (e *Executor) Stop() {
 	e.registryRemove()
 }
 
-func RunWithDefaultOptionsLogger(logger *zap.SugaredLogger) (executor *Executor, err error) {
+func RunWithDefaultOptionsLogger(logger *slog.Logger) (executor *Executor, err error) {
 	opts := Options{}
 	opts.Logger = logger
 	utils.NewOptions(env.GetInstance(), &opts)
@@ -145,7 +144,7 @@ func (e *Executor) Run() (err error) {
 		e.logger.Info("[xxljob] Starting server at " + e.address)
 		err := server.ListenAndServe()
 		if err != nil {
-			e.logger.Panic(err)
+			e.logger.Error(err.Error())
 			panic(err)
 		}
 	}(e)
@@ -205,7 +204,7 @@ func (e *Executor) taskLog(writer http.ResponseWriter, request *http.Request) {
 		LogContent:  "",
 		IsEnd:       true,
 	}
-	e.logger.Debug("日志请求参数:%+v", req)
+	e.logger.Debug("日志请求参数:", slog.Attr{Key: "req", Value: slog.AnyValue(req)})
 	str, _ := utils.Marshal(res)
 	_, _ = writer.Write(str)
 }
@@ -219,7 +218,7 @@ func (e *Executor) beat(writer http.ResponseWriter, request *http.Request) {
 // 忙碌检测
 func (e *Executor) idleBeat(writer http.ResponseWriter, request *http.Request) {
 	req, _ := io.ReadAll(request.Body)
-	e.logger.Debug("[xxljob]忙碌检测>>>>", string(req))
+	e.logger.Debug("[xxljob]忙碌检测>>>>" + string(req))
 	param := &IdleBeatReq{}
 	err := utils.Unmarshal(req, &param)
 	if err != nil {
@@ -235,7 +234,7 @@ func (e *Executor) idleBeat(writer http.ResponseWriter, request *http.Request) {
 		e.logger.Error("idleBeat任务[" + jobIdStr + "]正在运行")
 		return
 	}
-	e.logger.Debug("忙碌检测任务参数:%v", param)
+	e.logger.Debug("忙碌检测任务参数:", slog.Attr{Key: "params", Value: slog.AnyValue(param)})
 	_, _ = writer.Write(commonSuccessResp())
 }
 
@@ -252,17 +251,17 @@ func (e *Executor) callback(task *Task, code int64, msg string) {
 	for _, addr := range e.opts.adminAddresseList {
 		result, err := e.post(addr, callBackPath, []*JobHandleResult{req})
 		if err != nil {
-			e.logger.Error("回调任务失败:", err.Error(), ",", result.Code, ",", result.Msg)
+			e.logger.Error("回调任务失败:"+err.Error(), ",", result.Code, ",", result.Msg)
 			return
 		}
-		e.logger.Debug("回调任务成功:", result.Code, "[", result.Msg)
+		e.logger.Debug("回调任务成功:", strconv.FormatInt(result.Code, 10), "[", result.Msg)
 	}
 }
 
 // 运行一个任务
 func (e *Executor) runTask(writer http.ResponseWriter, request *http.Request) {
 	req, _ := io.ReadAll(request.Body)
-	e.logger.Debug("[xxljob]runTask>>>>>", string(req))
+	e.logger.Debug("[xxljob]runTask>>>>>" + string(req))
 	param := &RunRequest{}
 	err := utils.Unmarshal(req, param)
 	if err != nil {
@@ -270,11 +269,11 @@ func (e *Executor) runTask(writer http.ResponseWriter, request *http.Request) {
 		e.logger.Error("参数解析错误:" + string(req))
 		return
 	}
-	e.logger.Debug("任务参数:%v", param)
+	e.logger.Debug("任务参数:", slog.Attr{Key: "params", Value: slog.AnyValue(param)})
 	jodIdStr := strconv.FormatInt(param.JobID, 10)
 	if !e.regList.Exists(param.ExecutorHandler) {
 		_, _ = writer.Write(commonFailWithMsgResp("Task not registered"))
-		e.logger.Error("任务[", param.JobID, "]没有注册:", param.ExecutorHandler)
+		e.logger.Error("任务["+jodIdStr, "]没有注册:", param.ExecutorHandler)
 		return
 	}
 	e.mu.Lock()
@@ -319,15 +318,15 @@ func (e *Executor) registryRemove() {
 		RegistryKey:   e.opts.AppName,
 		RegistryValue: DefaultRegisterAddressHttp + e.address,
 	}
-	e.logger.Debug("执行器摘除:", DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
+	e.logger.Debug("执行器摘除:"+DefaultRegistryGroup, "[", req.RegistryKey, " ]", req.RegistryValue)
 	for _, addr := range e.opts.adminAddresseList {
 		go func(url string) {
 			result, err := e.post(url, regRemovePath, req)
 			if err != nil {
-				e.logger.Error("执行器摘除失败:", err.Error(), ",", result.Code, ",", result.Msg)
+				e.logger.Error("执行器摘除失败:"+err.Error(), ",", result.Code, ",", result.Msg)
 				return
 			}
-			e.logger.Debug("执行器摘除成功:", result.Code, "[", result.Msg)
+			e.logger.Debug("执行器摘除成功:", strconv.FormatInt(result.Code, 10), "[", result.Msg)
 		}(addr)
 	}
 }
@@ -356,10 +355,10 @@ func (e *Executor) registry() {
 			go func(url string) {
 				result, err := e.post(url, regPath, req)
 				if err != nil {
-					e.logger.Error("执行器注册失败:", err.Error(), ",", result.Code, ",", result.Msg)
+					e.logger.Error("执行器注册失败:"+err.Error(), ",", result.Code, ",", result.Msg)
 					return
 				}
-				e.logger.Debug("执行器注册成功:", result.Code, "->", result.Msg)
+				e.logger.Debug("执行器注册成功:", slog.Attr{Key: "code", Value: slog.Int64Value(result.Code)}, slog.Attr{Key: "msg", Value: slog.AnyValue(result.Msg)})
 			}(addr)
 		}
 
@@ -374,7 +373,7 @@ func (e *Executor) post(addr, path string, body any) (resp *Resp, err error) {
 	resp = &Resp{}
 	bodyBytes, err := utils.Marshal(body)
 	if err != nil {
-		logger.Error("[xxljob] request error:", err.Error())
+		slog.Error("[xxljob] request error:" + err.Error())
 		return resp, err
 	}
 	httpReq, err := http.NewRequest(http.MethodPost, addr+path, bytes.NewReader(bodyBytes))

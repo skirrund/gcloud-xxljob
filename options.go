@@ -1,9 +1,8 @@
 package gxxljob
 
 import (
+	"log/slog"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 type Options struct {
@@ -19,7 +18,7 @@ type Options struct {
 	ExecutorAddress string `json:"executor_address" property:"xxl.job.executor.address"`
 	//执行器端口号 [选填]：小于等于0则自动获取；默认端口为9999，单机部署多个执行器时，注意要配置不同执行器端口；
 	ExecutorPort int64 `json:"executor_port" property:"xxl.job.executor.port"`
-	Logger       *zap.SugaredLogger
+	Logger       *slog.Logger
 	// 执行器运行日志文件存储磁盘路径 [选填] ：需要对该路径拥有读写权限；为空则使用默认路径；
 	LogPath string `json:"log_path" property:"xxl.job.executor.logpath"`
 	//执行器日志文件保存天数 [选填] ： 过期日志自动清理, 限制值大于等于3时生效; 否则, 如-1, 关闭自动清理功能；
@@ -53,7 +52,7 @@ func (opt *Options) WithLogPath(logPath string) *Options {
 	opt.LogPath = logPath
 	return opt
 }
-func (opt *Options) WithLogger(logger *zap.SugaredLogger) *Options {
+func (opt *Options) WithLogger(logger *slog.Logger) *Options {
 	opt.Logger = logger
 	return opt
 }
