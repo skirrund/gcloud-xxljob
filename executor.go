@@ -107,16 +107,21 @@ func (e *Executor) Stop() {
 }
 
 func RunWithDefaultOptionsLogger(logger *slog.Logger) (executor *Executor, err error) {
+	return RunWithDefaultOptionsLoggerAndAppName("", slog.Default())
+}
+
+func RunWithDefaultOptionsLoggerAndAppName(appName string, logger *slog.Logger) (executor *Executor, err error) {
 	opts := Options{}
 	opts.Logger = logger
 	utils.NewOptions(env.GetInstance(), &opts)
+	if len(appName) > 0 {
+		opts.WithAppName(appName)
+	}
 	return RunWithOptions(opts)
 }
 
-func RunWithDefaultOptions() (executor *Executor, err error) {
-	opts := Options{}
-	utils.NewOptions(env.GetInstance(), &opts)
-	return RunWithOptions(opts)
+func RunWithDefaultOptions(appName string) (executor *Executor, err error) {
+	return RunWithDefaultOptionsLoggerAndAppName(appName, slog.Default())
 }
 
 func RunWithOptions(opts Options) (executor *Executor, err error) {
