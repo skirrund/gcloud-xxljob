@@ -2,7 +2,7 @@ module github.com/skirrund/gcloud-xxljob
 
 go 1.22
 
-require github.com/skirrund/gcloud v0.9.1
+require github.com/skirrund/gcloud v0.9.4
 
 require (
 	github.com/bytedance/sonic v1.12.2 // indirect
@@ -17,7 +17,6 @@ require (
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
